@@ -24,7 +24,10 @@ or changed from Settings, and `localectl` refuses to run:
 - `/etc/locale.conf` and `/etc/vconsole.conf` are read as defaults when the
   writable copies do not exist yet, because `/etc` is part of the read-only
   image;
-- a locale is accepted only if it is installed, as reported by `locale -a`.
+- a locale is accepted only if it is installed: listed in the glibc locale
+  archive (`/usr/lib/locale/locale-archive`) or compiled into its own
+  directory under `/usr/lib/locale`. The archive is read directly, so the
+  `locale` utility does not need to be on the system.
 
 ## Usage
 

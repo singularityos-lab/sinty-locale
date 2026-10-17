@@ -2,6 +2,8 @@ package locale
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
@@ -111,15 +113,54 @@ func normalize(name string) string {
 	return lang + "." + codeset
 }
 
-func SystemLocales() []string {
-	out, err := exec.Command("locale", "-a").Output()
-	if err != nil {
+const archiveMagic = 0xde020109
+
+func ArchiveLocales(data []byte) []string {
+	u32 := func(off uint64) (uint32, bool) {
+		if off+4 > uint64(len(data)) {
+			return 0, false
+		}
+		return binary.LittleEndian.Uint32(data[off:]), true
+	}
+	if magic, ok := u32(0); !ok || magic != archiveMagic {
 		return nil
 	}
+	hashOff, ok1 := u32(8)
+	hashSize, ok2 := u32(16)
+	if !ok1 || !ok2 {
+		return nil
+	}
+	var names []string
+	for i := uint64(0); i < uint64(hashSize); i++ {
+		entry := uint64(hashOff) + i*12
+		nameOff, ok := u32(entry + 4)
+		if !ok {
+			break
+		}
+		if nameOff == 0 || uint64(nameOff) >= uint64(len(data)) {
+			continue
+		}
+		end := bytes.IndexByte(data[nameOff:], 0)
+		if end <= 0 {
+			continue
+		}
+		names = append(names, string(data[nameOff:uint64(nameOff)+uint64(end)]))
+	}
+	return names
+}
+
+func (s System) installedLocales() []string {
 	var list []string
-	for _, l := range strings.Split(string(out), "\n") {
-		if l = strings.TrimSpace(l); l != "" {
-			list = append(list, l)
+	if data, err := os.ReadFile(s.path("/usr/lib/locale/locale-archive")); err == nil {
+		list = append(list, ArchiveLocales(data)...)
+	}
+	entries, _ := os.ReadDir(s.path("/usr/lib/locale"))
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(s.path("/usr/lib/locale"), e.Name(), "LC_CTYPE")); err == nil {
+			list = append(list, e.Name())
 		}
 	}
 	return list
@@ -129,7 +170,7 @@ func (s System) available() []string {
 	if s.Available != nil {
 		return s.Available()
 	}
-	return SystemLocales()
+	return s.installedLocales()
 }
 
 func (s System) ListLocales() []string {

@@ -1,9 +1,11 @@
 package locale
 
 import (
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -77,5 +79,49 @@ func TestKeyboard(t *testing.T) {
 		if err := s.SetConsoleKeyboard(bad, "", false); err == nil {
 			t.Errorf("%q accepted", bad)
 		}
+	}
+}
+
+func archive(names ...string) []byte {
+	const hashOff, hashSize = 56, 7
+	strOff := hashOff + hashSize*12
+	data := make([]byte, strOff)
+	binary.LittleEndian.PutUint32(data[0:], archiveMagic)
+	binary.LittleEndian.PutUint32(data[8:], hashOff)
+	binary.LittleEndian.PutUint32(data[12:], uint32(len(names)))
+	binary.LittleEndian.PutUint32(data[16:], hashSize)
+	for i, n := range names {
+		slot := hashOff + (i*3%hashSize)*12
+		binary.LittleEndian.PutUint32(data[slot+4:], uint32(len(data)))
+		data = append(data, append([]byte(n), 0)...)
+	}
+	return data
+}
+
+func TestArchiveLocales(t *testing.T) {
+	got := ArchiveLocales(archive("it_IT.utf8", "en_US.utf8"))
+	sort.Strings(got)
+	if !reflect.DeepEqual(got, []string{"en_US.utf8", "it_IT.utf8"}) {
+		t.Fatalf("names %v", got)
+	}
+	bad := archive("it_IT.utf8")
+	binary.LittleEndian.PutUint32(bad[16:], 1<<30)
+	ArchiveLocales(bad)
+	short := archive("x")[:20]
+	if ArchiveLocales(short) != nil {
+		t.Fatal("truncated archive parsed")
+	}
+	if ArchiveLocales([]byte("not an archive")) != nil {
+		t.Fatal("wrong magic parsed")
+	}
+	s := System{Root: t.TempDir(), LoadKeys: func(string) error { return nil }}
+	os.MkdirAll(filepath.Join(s.Root, "usr/lib/locale/de_DE.utf8"), 0o755)
+	os.WriteFile(filepath.Join(s.Root, "usr/lib/locale/de_DE.utf8/LC_CTYPE"), []byte("x"), 0o644)
+	os.WriteFile(filepath.Join(s.Root, "usr/lib/locale/locale-archive"), archive("it_IT.utf8"), 0o644)
+	if got := s.ListLocales(); !reflect.DeepEqual(got, []string{"de_DE.UTF-8", "it_IT.UTF-8"}) {
+		t.Fatalf("ListLocales %v", got)
+	}
+	if err := s.SetLocale([]string{"LANG=it_IT.UTF-8"}); err != nil {
+		t.Fatal(err)
 	}
 }
