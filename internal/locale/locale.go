@@ -203,9 +203,6 @@ func (s System) SetLocale(assignments []string) error {
 		}
 		values[k] = v
 	}
-	if len(values) > 0 && values["LANG"] == "" {
-		return errors.New("LANG must be set")
-	}
 	if len(values) == 0 {
 		err := os.Remove(s.LocaleFile())
 		if err != nil && !errors.Is(err, os.ErrNotExist) {

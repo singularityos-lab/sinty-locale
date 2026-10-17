@@ -27,7 +27,7 @@ func TestSetLocale(t *testing.T) {
 	if got := s.Locale(); !reflect.DeepEqual(got, []string{"LANG=it_IT.UTF-8", "LANGUAGE=it:en", "LC_TIME=en_US.UTF-8"}) {
 		t.Fatalf("Locale %v", got)
 	}
-	for _, bad := range [][]string{{"LANG=xx_YY.UTF-8"}, {"LC_TIME=en_US.UTF-8"}, {"FOO=en_US.UTF-8"}, {"LANG"}, {"LANG=en_US.UTF-8", "LANGUAGE=it;rm"}} {
+	for _, bad := range [][]string{{"LANG=xx_YY.UTF-8"}, {"LC_TIME=xx_YY.UTF-8"}, {"FOO=en_US.UTF-8"}, {"LANG"}, {"LANG=en_US.UTF-8", "LANGUAGE=it;rm"}} {
 		if err := s.SetLocale(bad); err == nil {
 			t.Errorf("%v accepted", bad)
 		}
