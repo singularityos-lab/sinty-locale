@@ -1,0 +1,5 @@
+[D-BUS Service]
+Name=org.freedesktop.locale1
+Exec=/usr/libexec/sinty-localed
+User=root
+SystemdService=sinty-localed.service
